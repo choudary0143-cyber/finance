@@ -1,0 +1,579 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finance Status Dashboard</title>
+    <style>
+        /* Global Styles */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 500px;
+        }
+
+        h1, h2 {
+            text-align: center;
+            color: #333;
+            font-size: 1.5em;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="number"],
+        input[type="date"],
+        input[type="month"],
+        select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 8px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        #total {
+            font-weight: bold;
+            margin-top: 10px;
+            text-align: right;
+        }
+
+        .filter-section {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 15px;
+        }
+
+        .download-section {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .download-section button {
+            background-color: #008CBA;
+        }
+
+        .download-section button:hover {
+            background-color: #006d93;
+        }
+
+        .link-section {
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .link-section a {
+            color: #008CBA;
+            text-decoration: none;
+            font-size: 0.9em;
+            margin: 0 10px;
+        }
+
+        .link-section a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 600px) {
+            .container {
+                width: 95%;
+                padding: 15px;
+            }
+
+            input, button, select, .link-section a {
+                font-size: 0.9em;
+            }
+
+            .filter-section, .download-section {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Login Section -->
+        <div id="login-section">
+            <h1>Finance Dashboard</h1>
+            <form id="login-form">
+                <input type="email" id="login-email" placeholder="Email" required>
+                <button type="submit">Request OTP</button>
+            </form>
+            <div class="link-section">
+                <a href="#" id="forgot-password">Forgot Access?</a>
+                <a href="#" id="register-link">Register</a>
+            </div>
+        </div>
+
+        <!-- OTP Verification Section -->
+        <div id="otp-section" class="hidden">
+            <h1>Verify OTP</h1>
+            <form id="otp-form">
+                <input type="text" id="otp-input" placeholder="Enter OTP" required>
+                <button type="submit">Verify OTP</button>
+            </form>
+            <div class="link-section">
+                <a href="#" id="back-to-login-from-otp">Back to Login</a>
+            </div>
+        </div>
+
+        <!-- Password Recovery Section -->
+        <div id="recovery-section" class="hidden">
+            <h1>Recover Access</h1>
+            <form id="recovery-form">
+                <input type="email" id="recovery-email" placeholder="Enter your email" required>
+                <button type="submit">Request OTP</button>
+            </form>
+            <div class="link-section">
+                <a href="#" id="back-to-login">Back to Login</a>
+            </div>
+        </div>
+
+        <!-- Registration Section -->
+        <div id="register-section" class="hidden">
+            <h1>Register</h1>
+            <form id="register-form">
+                <input type="text" id="reg-username" placeholder="Username" required>
+                <input type="email" id="reg-email" placeholder="Email" required>
+                <button type="submit">Register</button>
+            </form>
+            <div class="link-section">
+                <a href="#" id="back-to-login-from-register">Back to Login</a>
+            </div>
+        </div>
+
+        <!-- Dashboard Section -->
+        <div id="dashboard-section" class="hidden">
+            <h1>Finance Status</h1>
+            <p>Add daily or monthly finance entries.</p>
+            
+            <h2>Add Entry</h2>
+            <form id="entry-form">
+                <input type="text" id="name" placeholder="Name (e.g., Salary)" required>
+                <input type="number" id="amount" placeholder="Amount" required>
+                <input type="date" id="entry-date" required>
+                <button type="submit">Add</button>
+            </form>
+
+            <h2>Entries</h2>
+            <div class="filter-section">
+                <select id="filter-type">
+                    <option value="all">All Entries</option>
+                    <option value="daily">Daily</option>
+                    <option value="monthly">Monthly</option>
+                </select>
+                <input type="date" id="filter-date" class="hidden">
+                <input type="month" id="filter-month" class="hidden">
+            </div>
+            <table id="entries-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+
+            <div id="total">Total: 0</div>
+
+            <div class="download-section">
+                <button id="download-csv">Download CSV</button>
+            </div>
+
+            <button id="logout">Logout</button>
+        </div>
+    </div>
+
+    <script>
+        // Client-side state
+        let entries = [];
+        let total = 0;
+        let currentEmail = null; // Track email for OTP verification
+
+        const loginForm = document.getElementById('login-form');
+        const loginSection = document.getElementById('login-section');
+        const otpSection = document.getElementById('otp-section');
+        const otpForm = document.getElementById('otp-form');
+        const recoverySection = document.getElementById('recovery-section');
+        const recoveryForm = document.getElementById('recovery-form');
+        const forgotPasswordLink = document.getElementById('forgot-password');
+        const registerLink = document.getElementById('register-link');
+        const registerSection = document.getElementById('register-section');
+        const registerForm = document.getElementById('register-form');
+        const backToLoginLink = document.getElementById('back-to-login');
+        const backToLoginFromRegister = document.getElementById('back-to-login-from-register');
+        const backToLoginFromOtp = document.getElementById('back-to-login-from-otp');
+        const dashboardSection = document.getElementById('dashboard-section');
+        const entryForm = document.getElementById('entry-form');
+        const entriesTableBody = document.querySelector('#entries-table tbody');
+        const totalElement = document.getElementById('total');
+        const logoutButton = document.getElementById('logout');
+        const filterType = document.getElementById('filter-type');
+        const filterDate = document.getElementById('filter-date');
+        const filterMonth = document.getElementById('filter-month');
+        const downloadCsvButton = document.getElementById('download-csv');
+
+        // Login: Request OTP
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+            if (!emailRegex.test(email)) {
+                alert('Please enter a valid email');
+                return;
+            }
+
+            try {
+                const response = await fetch('/request-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    currentEmail = email;
+                    loginSection.classList.add('hidden');
+                    otpSection.classList.remove('hidden');
+                    alert(data.message + ' (Check your email, including spam/junk folders)');
+                    document.getElementById('login-email').value = '';
+                } else {
+                    alert(data.error);
+                }
+            } catch (err) {
+                alert('Error requesting OTP. Please try again.');
+            }
+        });
+
+        // OTP Verification
+        otpForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const otp = document.getElementById('otp-input').value;
+
+            try {
+                const response = await fetch('/verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: currentEmail, otp })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    otpSection.classList.add('hidden');
+                    dashboardSection.classList.remove('hidden');
+                    currentEmail = null;
+                    document.getElementById('otp-input').value = '';
+                    alert(data.message);
+                } else {
+                    alert(data.error);
+                }
+            } catch (err) {
+                alert('Error verifying OTP. Please try again.');
+            }
+        });
+
+        backToLoginFromOtp.addEventListener('click', (e) => {
+            e.preventDefault();
+            otpSection.classList.add('hidden');
+            loginSection.classList.remove('hidden');
+            currentEmail = null;
+            document.getElementById('otp-input').value = '';
+        });
+
+        // Registration
+        registerLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            loginSection.classList.add('hidden');
+            registerSection.classList.remove('hidden');
+        });
+
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('reg-username').value;
+            const email = document.getElementById('reg-email').value;
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+            if (!username || !emailRegex.test(email)) {
+                alert('Please enter a valid username and email');
+                return;
+            }
+
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert(data.message);
+                    registerSection.classList.add('hidden');
+                    loginSection.classList.remove('hidden');
+                    document.getElementById('reg-username').value = '';
+                    document.getElementById('reg-email').value = '';
+                } else {
+                    alert(data.error);
+                }
+            } catch (err) {
+                alert('Error registering. Please try again.');
+            }
+        });
+
+        backToLoginFromRegister.addEventListener('click', (e) => {
+            e.preventDefault();
+            registerSection.classList.add('hidden');
+            loginSection.classList.remove('hidden');
+            document.getElementById('reg-username').value = '';
+            document.getElementById('reg-email').value = '';
+        });
+
+        // Recovery: Request OTP
+        forgotPasswordLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            loginSection.classList.add('hidden');
+            recoverySection.classList.remove('hidden');
+        });
+
+        recoveryForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('recovery-email').value;
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+            if (!emailRegex.test(email)) {
+                alert('Please enter a valid email address');
+                return;
+            }
+
+            try {
+                const response = await fetch('/request-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    currentEmail = email;
+                    recoverySection.classList.add('hidden');
+                    otpSection.classList.remove('hidden');
+                    alert(data.message + ' (Check your email, including spam/junk folders)');
+                    document.getElementById('recovery-email').value = '';
+                } else {
+                    alert(data.error);
+                }
+            } catch (err) {
+                alert('Error requesting OTP. Please try again.');
+            }
+        });
+
+        backToLoginLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            recoverySection.classList.add('hidden');
+            loginSection.classList.remove('hidden');
+            document.getElementById('recovery-email').value = '';
+        });
+
+        // Dashboard functionality
+        entryForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('name').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+            const date = document.getElementById('entry-date').value;
+
+            if (name && !isNaN(amount) && date) {
+                entries.push({ name, amount, date });
+                renderEntries(entries);
+                document.getElementById('name').value = '';
+                document.getElementById('amount').value = '';
+                document.getElementById('entry-date').value = '';
+            }
+        });
+
+        filterType.addEventListener('change', (e) => {
+            filterDate.classList.add('hidden');
+            filterMonth.classList.add('hidden');
+            
+            if (e.target.value === 'daily') {
+                filterDate.classList.remove('hidden');
+            } else if (e.target.value === 'monthly') {
+                filterMonth.classList.remove('hidden');
+            }
+            
+            renderEntries(entries);
+        });
+
+        filterDate.addEventListener('change', () => renderEntries(entries));
+        filterMonth.addEventListener('change', () => renderEntries(entries));
+
+        function renderEntries(entriesToRender) {
+            const filter = filterType.value;
+            let filteredEntries = entriesToRender;
+            total = 0;
+
+            if (filter === 'daily' && filterDate.value) {
+                filteredEntries = entries.filter(entry => entry.date === filterDate.value);
+            } else if (filter === 'monthly' && filterMonth.value) {
+                const [year, month] = filterMonth.value.split('-');
+                filteredEntries = entries.filter(entry => {
+                    const entryDate = new Date(entry.date);
+                    return entryDate.getFullYear() === parseInt(year) && 
+                           entryDate.getMonth() === parseInt(month) - 1;
+                });
+            }
+
+            entriesTableBody.innerHTML = '';
+            filteredEntries.forEach(entry => {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${entry.name}</td><td>${entry.amount.toFixed(2)}</td><td>${entry.date}</td>`;
+                entriesTableBody.appendChild(row);
+                total += entry.amount;
+            });
+
+            totalElement.textContent = `Total: ${total.toFixed(2)}`;
+        }
+
+        downloadCsvButton.addEventListener('click', () => {
+            const filter = filterType.value;
+            let filteredEntries = entries;
+            let filename = 'finance_entries_all.csv';
+
+            if (filter === 'daily' && filterDate.value) {
+                filteredEntries = entries.filter(entry => entry.date === filterDate.value);
+                filename = `finance_entries_${filterDate.value}.csv`;
+            } else if (filter === 'monthly' && filterMonth.value) {
+                const [year, month] = filterMonth.value.split('-');
+                filteredEntries = entries.filter(entry => {
+                    const entryDate = new Date(entry.date);
+                    return entryDate.getFullYear() === parseInt(year) && 
+                           entryDate.getMonth() === parseInt(month) - 1;
+                });
+                filename = `finance_entries_${filterMonth.value}.csv`;
+            }
+
+            const headers = ['Name', 'Amount', 'Date'];
+            const csvRows = [headers.join(',')];
+            filteredEntries.forEach(entry => {
+                const row = [
+                    `"${entry.name.replace(/"/g, '""')}"`,
+                    entry.amount.toFixed(2),
+                    entry.date
+                ];
+                csvRows.push(row.join(','));
+            });
+
+            const csvContent = csvRows.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        });
+
+        logoutButton.addEventListener('click', () => {
+            dashboardSection.classList.add('hidden');
+            loginSection.classList.remove('hidden');
+            entries = [];
+            entriesTableBody.innerHTML = '';
+            total = 0;
+            totalElement.textContent = 'Total: 0';
+            filterType.value = 'all';
+            filterDate.classList.add('hidden');
+            filterMonth.classList.add('hidden');
+        });
+    </script>
+</body>
+</html>
